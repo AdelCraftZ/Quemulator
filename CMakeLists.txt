@@ -3,4 +3,5 @@ project(Quemulator)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(Quemulator quemulator.cpp)
+file(GLOB depends "src/*cpp" "src/*hpp*")
+add_executable(Quemulator ${depends})
