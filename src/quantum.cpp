@@ -63,8 +63,10 @@ NQubit NQubit::operator*(NQubit const &q) const {
 }
 
 NQubit NQubit::measure() {
-
-
+	q_scalar_t x;
+	for (size_t i = 0; i < 50; i++) {
+		x = (*_p_rng)();
+	}
 
 	return NQubit();
 }
