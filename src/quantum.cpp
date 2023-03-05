@@ -64,16 +64,6 @@ private:
 
 // NQubit class //
 
-/*
-scalar_t NQubit::_calcNormSq() const {
-	scalar_t normSq = 0;
-	for (auto const &comp : _components) {
-		normSq += modulusSq(comp);   // What the standard calls “norm” is actually the squared norm.
-	}
-	return normSq;
-}
-*/
-
 NQubit &NQubit::operator*=(scalar_t s) const {
 	for (auto &comp : _components) {
 		comp *= s;
@@ -83,17 +73,17 @@ NQubit &NQubit::operator*=(scalar_t s) const {
 }
 
 NQubit NQubit::operator*(NQubit const &q) const {
-	NQubit newNQubit(_components.size() * q._components.size());
+	NQubit ret(_components.size() * q._components.size());
 
 	// algorithm for Kronecker product
-	auto it = newNQubit.begin();
+	auto it = ret._components.begin();
 	for (auto const &compThis : _components) {
 		for (auto const &compOther : q._components) {
 			*it++ = compThis * compOther;
 		}
 	}
 
-	return newNQubit;
+	return ret;
 }
 
 NQubit measure(NQubit const &q) {
@@ -102,7 +92,7 @@ NQubit measure(NQubit const &q) {
 
 	NQubit::size_type oneIdx = 0;
 	for (
-		auto pick = std::generate_canonical<scalar_t, std::numeric_limits<scalar_t>::digits>(rng);
+		auto pick = generate_canonical<scalar_t, numeric_limits<scalar_t>::digits>(rng);
 		oneIdx < q._components.size();
 		oneIdx++
 	) {
@@ -121,16 +111,14 @@ NQubit Gate::operator()(NQubit const &q) const {
 		throw logic_error(string("gate matrix column count is not equal to n-qubit dimension (") + to_string(_size) + " != " + to_string(q.getDim()) + ")");
 	}
 
-	//q._normalizeIfNeeded();
-
 	NQubit ret(q._components.size());
 
 	// algorithm for matrix product
 	for (size_type i = 0; i < _size; i++) {
 		size_type start = _size * i;
-		ret[i] = 0;
+		ret._components[i] = 0;
 		for (size_type j = 0; j < _size; j++) {
-			ret[i] += _coeffs[start + j] * q._components[j];
+			ret._components[i] += _coeffs[start + j] * q._components[j];
 		}
 	}
 
@@ -175,7 +163,7 @@ Gate Gate::operator*(const Gate &g) const {
 					size_t index = (i * g._size + j) * ret._size + k * g._size + l;
 
 					// compute the product of the corresponding elements in the two matrices
-					ret._coeffs[index] = _coeffs[i * _size + k] * g._coeffs[j * g._size + l];
+					ret._coeffs[index] = _coeffs[_size * i + k] * g._coeffs[g._size * j + l];
 				}
 			}
 		}

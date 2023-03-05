@@ -26,12 +26,6 @@ namespace qtm {
 class NQubit {
 	friend NQubit measure(NQubit const&);
 	friend class Gate;
-	/*
-private:
-	static std::size_t CONSTEVAL log2(std::size_t n) {
-		return n == 1 ? 0 : 1 + log2(n >> 1);
-	}
-	*/
 public:
 	using size_type = std::vector<Complex>::size_type;
 
@@ -64,56 +58,16 @@ public:
 	NQubit operator*(NQubit const &q) const;
 private:
 	static scalar_t constexpr _norm_limit = 1 << 16;
-
-	//std::size_t _n; // log base 2 of dimension;
 	mutable std::vector<Complex> _components;
 
 	explicit CONSTEXPR20 NQubit(size_type dim)
-		: /*_n(0), */_components(dim)
+		: _components(dim)
 	{}
 
 	explicit CONSTEXPR20 NQubit(size_type dim, size_type oneIdx)
-		: /*_n(0), */_components(dim, 0)
+		: _components(dim, 0)
 	{
 		_components[oneIdx] = 1;
-	}
-
-	/*
-	[[nodiscard]] scalar_t _calcNormSq() const;
-
-	void _normalize() const {
-		*this *= 1.0 / std::sqrt(_calcNormSq());
-	}
-
-	void _normalizeIfNeeded() const {
-		if (_calcNormSq() > _norm_limit) {
-			_normalize();
-		}
-	}
-	 */
-
-	auto CONSTEXPR20 begin() noexcept {
-		return _components.begin();
-	}
-
-	auto CONSTEXPR20 end() noexcept {
-		return _components.end();
-	}
-
-	[[nodiscard]] auto CONSTEXPR20 cbegin() const noexcept {
-		return _components.cbegin();
-	}
-
-	[[nodiscard]] auto CONSTEXPR20 cend() const noexcept {
-		return _components.cend();
-	}
-
-	std::vector<Complex>::reference CONSTEXPR20 operator[](size_type i) noexcept {
-		return _components[i];
-	}
-
-	std::vector<Complex>::const_reference CONSTEXPR20 operator[](size_type i) const noexcept {
-		return _components[i];
 	}
 };
 
