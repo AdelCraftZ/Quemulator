@@ -147,7 +147,6 @@ Gate Gate::operator()(Gate const &g) const {
 	return ret;
 }
 
-
 Gate Gate::operator*(const Gate &g) const {
 	// Create a new Gate object with the correct dimensions
 	Gate ret(_size * g._size);
