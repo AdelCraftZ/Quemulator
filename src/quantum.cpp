@@ -83,17 +83,17 @@ NQubit &NQubit::operator*=(scalar_t s) const {
 }
 
 NQubit NQubit::operator*(NQubit const &q) const {
-	NQubit newNQubit(_components.size() * q._components.size());
+	NQubit ret(_components.size() * q._components.size());
 
 	// algorithm for Kronecker product
-	auto it = newNQubit.begin();
+	auto it = ret.begin();
 	for (auto const &compThis : _components) {
 		for (auto const &compOther : q._components) {
 			*it++ = compThis * compOther;
 		}
 	}
 
-	return newNQubit;
+	return ret;
 }
 
 NQubit measure(NQubit const &q) {
@@ -102,7 +102,7 @@ NQubit measure(NQubit const &q) {
 
 	NQubit::size_type oneIdx = 0;
 	for (
-		auto pick = std::generate_canonical<scalar_t, std::numeric_limits<scalar_t>::digits>(rng);
+		auto pick = generate_canonical<scalar_t, numeric_limits<scalar_t>::digits>(rng);
 		oneIdx < q._components.size();
 		oneIdx++
 	) {

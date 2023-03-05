@@ -12,7 +12,6 @@
 
 namespace qtm {
 using scalar_t = double;
-
 using Complex = std::complex<scalar_t>;
 
 inline scalar_t modulusSq(Complex const &z) {
