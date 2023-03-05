@@ -5,94 +5,199 @@
 #ifndef QUEMULATOR_QUANTUM_HPP
 #define QUEMULATOR_QUANTUM_HPP
 
+#include "config.hpp"
+#include "traits.hpp"
+
+#include "math.hpp"
+
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <complex>
+#include <array>
 #include <vector>
 #include <tuple>
-#include <initializer_list>
 #include <memory>
-#include <random>
+#include <type_traits>
+#include <iterator>
 
-#include <boost/nondet_random.hpp>
-
-using q_scalar_t = double;
-using QComplex = std::complex<q_scalar_t>;
-
-class QRandomizer {
-public:
-	using rng_seed_t = decltype(boost::random_device()());
-
-	explicit QRandomizer(rng_seed_t seed = boost::random_device()())
-		: _rngRaw(seed), dist(0, 1)
-	{}
-
-	q_scalar_t operator()() {
-		return dist(_rngRaw);
-	}
-private:
-	std::mt19937 _rngRaw;
-	std::uniform_real_distribution<q_scalar_t> dist;
-};
-
+namespace qtm {
 class NQubit {
-	friend class QGate;
+	friend NQubit measure(NQubit const&);
+	friend class Gate;
+	/*
+private:
+	static std::size_t CONSTEVAL log2(std::size_t n) {
+		return n == 1 ? 0 : 1 + log2(n >> 1);
+	}
+	*/
 public:
-	explicit NQubit(std::size_t n = 1, std::shared_ptr<QRandomizer> p_rng = std::make_shared<QRandomizer>())
-		: _p_rng(std::move(p_rng)), _components(1 << n)
-	{}
+	using size_type = std::vector<Complex>::size_type;
 
-	NQubit(std::initializer_list<QComplex> components, std::shared_ptr<QRandomizer> p_rng = std::make_shared<QRandomizer>())
-		: _p_rng(std::move(p_rng)), _components(components)
-	{}
+	template<typename T, typename ...Ts, std::enable_if_t<std::is_convertible_v<T, Complex>>* = nullptr>
+	NQubit(T component, Ts &&...components)
+			: /*_n(log2(1 + sizeof...(components))), */_components({std::forward<T>(component), std::forward<Ts>(components)...})
+	{
+		static_assert(QTM_IS_POWER_OF_2(1 + sizeof...(components)), "NQubit dimension must be a power of 2");
+	}
 
-	template<class InputIt>
-	NQubit(InputIt first, InputIt last, std::shared_ptr<QRandomizer> p_rng = std::make_shared<QRandomizer>())
-		: _p_rng(std::move(p_rng)), _components(first, last)
-	{}
+	size_type getDim() const {
+		return _components.size();
+	}
+
+	/*
+	bool operator==(NQubit const &other) const {
+		_normalize();
+		other._normalize();
+
+		return _components == other._components;
+	}
+	*/
+
+	bool operator==(NQubit const &other) const = delete;
 
 	// multiplication by a scalar
-	NQubit &operator*=(q_scalar_t s);
+	NQubit &operator*=(scalar_t s) const;
 
 	// Kronecker product
 	NQubit operator*(NQubit const &q) const;
-
-	NQubit measure();
 private:
-	std::shared_ptr<QRandomizer> _p_rng;
-	std::vector<QComplex> _components;
+	static scalar_t constexpr _norm_limit = 1 << 16;
 
-	explicit NQubit(std::vector<QComplex> &&components)
-		: _components(std::move(components))
+	//std::size_t _n; // log base 2 of dimension;
+	mutable std::vector<Complex> _components;
+
+	explicit CONSTEXPR20 NQubit(size_type dim)
+		: /*_n(0), */_components(dim)
 	{}
 
-	q_scalar_t _calcNormSq();
+	explicit CONSTEXPR20 NQubit(size_type dim, size_type oneIdx)
+		: /*_n(0), */_components(dim, 0)
+	{
+		_components[oneIdx] = 1;
+	}
 
-	void _normalize();
+	/*
+	[[nodiscard]] scalar_t _calcNormSq() const;
 
-	void _normalizeIfNeeded();
+	void _normalize() const {
+		*this *= 1.0 / std::sqrt(_calcNormSq());
+	}
+
+	void _normalizeIfNeeded() const {
+		if (_calcNormSq() > _norm_limit) {
+			_normalize();
+		}
+	}
+	 */
+
+	auto CONSTEXPR20 begin() noexcept {
+		return _components.begin();
+	}
+
+	auto CONSTEXPR20 end() noexcept {
+		return _components.end();
+	}
+
+	[[nodiscard]] auto CONSTEXPR20 cbegin() const noexcept {
+		return _components.cbegin();
+	}
+
+	[[nodiscard]] auto CONSTEXPR20 cend() const noexcept {
+		return _components.cend();
+	}
+
+	std::vector<Complex>::reference CONSTEXPR20 operator[](size_type i) noexcept {
+		return _components[i];
+	}
+
+	std::vector<Complex>::const_reference CONSTEXPR20 operator[](size_type i) const noexcept {
+		return _components[i];
+	}
 };
 
-class QGate {
+class Gate {
 public:
-	QGate(std::initializer_list<std::initializer_list<QComplex>> coeffs);
+	using size_type = std::vector<Complex>::size_type;
 
-	// matrix product
-	NQubit operator*(NQubit const &q) const;
+	template<std::size_t n, std::size_t ...ns>
+	constexpr Gate(Complex const (&row)[n], Complex const (&...rows)[ns])
+		:  _size(n), _coeffs(_size * _size)
+	{
+		static_assert((... && (n == ns)), "all rows must have the same size");
+		static_assert(n == 1 + sizeof...(ns), "number of columns must equal number of rows");
+		static_assert(QTM_IS_POWER_OF_2(n), "both the number of columns and rows must be a power of 2");
 
-	// matrix product (alternative syntax)
-	NQubit operator()(NQubit const &q) const {
-		return *this * q;
+		auto pos = std::copy(row, row + n, _coeffs.begin());
+		((pos = std::copy(rows, rows + n, pos)), ...);
 	}
+
+	// Matrix product
+	NQubit operator()(NQubit const&) const;
+
+	// Matrix product
+	Gate operator()(Gate const&) const;
+
+	// Kronecker product
+	Gate operator*(Gate const&) const;
 private:
-	std::size_t _rowCnt;
-	std::size_t _colCnt;
-	std::vector<QComplex> _coeffs;
+	size_type _size;
+	std::vector<Complex> _coeffs;
+
+	Gate(size_type size)
+		: _size(size), _coeffs(_size * _size)
+	{}
 };
 
 // Usual quantum gates //
 
-extern QGate qgNot;
+extern Gate const gIdentity;    // identity
+extern Gate const gX;   // Pauli's X (NOT)
+extern Gate const gY;   // Pauli's Y
+extern Gate const gZ;   // Pauli's Z
+extern Gate const gS;   // phase gate S
+extern Gate const gSqrtNot; // sqrt of X
+extern Gate const gH;   // Hadamard
+extern Gate const gCX;  // controlled X
+extern Gate const gCXReverse;   // reverse controlled X
+extern Gate const gAntiX;    // reverse controlled X
+extern Gate const gCZ;   // controlled Z
+extern Gate const gDX;  // double controlled X
+extern Gate const gSwap;    // swap
+extern Gate const gISwap;   // imaginary swap
+extern Gate const gFSwap;   // fermionic swap
+
+// phase shift
+inline Gate makeGPhaseShift(Complex const &power) {
+	return {
+		{1, 0},
+		{0, exp(power)}
+	};
+}
+
+extern Gate const gT;   // phase gate T
+
+// controlled shift
+inline Gate makeGControlledShift(Complex const &power) {
+	return {
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, exp(power)},
+	};
+}
+
+extern Gate const gCS;   // controlled phase S
+
+// rotation about x-axis
+inline Gate makeGRX(scalar_t theta);
+
+// rotation about x-axis
+inline Gate makeGRY(scalar_t theta);
+
+// rotation about x-axis
+inline Gate makeGRZ(scalar_t theta);
+} // qtm
 
 #endif //QUEMULATOR_QUANTUM_HPP

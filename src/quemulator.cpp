@@ -1,10 +1,9 @@
 #include <cstdlib>
-#include <memory>
 
 #include "quantum.hpp"
 
 int main() {
-	std::shared_ptr<QRandomizer> p_rng = std::make_shared<QRandomizer>();
+	using namespace qtm;
 
 	NQubit q0 = {
 		1,
@@ -15,14 +14,8 @@ int main() {
 		1
 	};
 
-	NQubit q11 = q1 * q1;
-
-	NQubit r = qgNot(q1);
-
-	q0.measure();
-	q0.measure();
-	q0.measure();
-	q0.measure();
+	NQubit out = (gH * gH)(gCZ)(gZ * gZ)(gH * gH)(gX * gX)(gCZ)(gX * gX)(gH * gH)(q0 * q0);
+	NQubit meas = measure(out);
 
 	return EXIT_SUCCESS;
 }
